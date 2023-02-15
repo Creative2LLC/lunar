@@ -36,7 +36,7 @@
                                                type="checkbox"
                                                @if (in_array($productImage->id, $this->currentImageIds)) disabled @endif>
                                         <img src="{{ $productImage->getFullUrl('small') }}"
-                                             class="border-2 border-transparent rounded-lg shadow-sm peer-checked:border-blue-500">
+                                             class="border border-transparent rounded-lg shadow-sm peer-checked:border-blue-500">
                                     </label>
                                 @empty
                                     <div class="col-span-3">
@@ -86,6 +86,7 @@
                  sort.options='{group: "images", method: "sort"}'
                  class="relative mt-4 space-y-2">
                 @foreach ($this->images as $key => $image)
+                    {{-- @dump($image) --}}
                     <div class="flex items-center justify-between p-4 bg-white border rounded-md shadow-sm"
                          sort.item="images"
                          sort.id="{{ $key }}"
@@ -97,71 +98,19 @@
                                 </div>
                             @endif
 
-                            <div class="flex flex-shrink-0" x-data="{ imageBlob: null }">
+                            <div class="flex flex-shrink-0">
                                 <button type="button"
                                         wire:click="$set('images.{{ $key }}.preview', true)">
-                                    <x-hub::thumbnail :src="$image['thumbnail']" />
+                                    @if (!empty($image['id']))
+                                        <x-hub::thumbnail :src="spatie_asset(loadMedia($image['id']))" />
+                                    @else
+                                        <x-hub::thumbnail :src="$image['thumbnail']" />
+                                    @endif
                                 </button>
 
-                                @if($images[$key]['preview'] )
-                                    <x-hub::modal wire:model="images.{{ $key }}.preview">
-                                        <img src="{{ $image['original'] }}">
-                                    </x-hub::modal>
-                                @endif
-
-                                @if($images[$key]['edit'])
-                                    <x-hub::modal wire:model="images.{{ $key }}.edit" max-width="5xl">
-                                        <div
-                                            x-data="{
-                                                filerobotImageEditor: null,
-
-                                                init() {
-                                                    const { TABS, TOOLS } = FilerobotImageEditor;
-                                                    const config = {
-                                                        source: imageBlob ? imageBlob : '{{ $image['original'] }}',
-                                                        Rotate: { angle: 45, componentType: 'slider' },
-                                                        theme: {
-                                                            typography: {
-                                                              fontFamily: 'Nunito, Arial',
-                                                            },
-                                                        }
-                                                    }
-
-                                                    filerobotImageEditor = new FilerobotImageEditor($el, config);
-
-                                                    filerobotImageEditor.render({
-                                                        onClose: (closingReason) => {
-                                                            @this.set('images.{{ $key }}.edit', false)
-
-                                                            filerobotImageEditor.terminate();
-                                                        },
-                                                        onBeforeSave: (imageFileInfo) => false,
-                                                        onSave: (imageData, imageDesignState) => {
-
-                                                            imageBlob = imageData.imageBase64
-
-                                                            fetch(imageData.imageBase64)
-                                                                .then(res => res.blob())
-                                                                .then(blob => {
-                                                                    const file = new File([blob], imageData.fullName,{ type: imageData.mimeType })
-
-                                                                    @this.upload('images.{{ $key }}.file', file)
-
-                                                                    @this.set('images.{{ $key }}.edit', false)
-
-                                                                    @this.set('images.{{ $key }}.thumbnail', imageData.imageBase64)
-
-                                                                    @this.set('images.{{ $key }}.original', imageData.imageBase64)
-                                                                })
-                                                        }
-                                                    });
-                                                }
-                                            }"
-
-                                        >
-                                        </div>
-                                    </x-hub::modal>
-                                @endif
+                                <x-hub::modal wire:model="images.{{ $key }}.preview">
+                                    <img src="{{ spatie_asset(loadMedia($image['id'])) }}" alt="Image">
+                                </x-hub::modal>
                             </div>
 
                             <div class="w-full">
@@ -182,28 +131,18 @@
                                                 type="button">
                                             <x-hub::icon ref="refresh"
                                                          style="solid"
-                                                         class="text-gray-400 hover:text-indigo-500" />
+                                                         class="text-gray-400 hover:text-indigo-500 hover:underline" />
                                         </button>
                                     </x-hub::tooltip>
                                 @endif
 
                                 <button type="button"
-                                    wire:click="$set('images.{{ $key }}.edit', true)">
-                                    <x-hub::icon ref="pencil"
-                                                 style="solid"
-                                                 class="text-gray-400 hover:text-indigo-500" />
+                                        wire:click.prevent="removeImage('{{ $key }}')"
+                                        class="text-gray-400 hover:text-red-500 "
+                                        @if ($image['primary']) disabled @endif>
+                                    <x-hub::icon ref="trash"
+                                                 style="solid" />
                                 </button>
-
-                                <x-hub::tooltip :text="$image['primary'] ? __('adminhub::partials.image-manager.delete_primary') : __('adminhub::partials.image-manager.delete_row_btn')">
-                                    <button type="button"
-                                            wire:click.prevent="removeImage('{{ $key }}')"
-                                            class="text-gray-400 hover:text-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                                            @if($image['primary']) disabled @endif>
-                                        <x-hub::icon ref="trash"
-                                                     style="solid"
-                                                     class="text-gray-400 hover:text-red-500" />
-                                    </button>
-                                </x-hub::tooltip>
                             </div>
                         </div>
                     </div>

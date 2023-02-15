@@ -31,9 +31,9 @@
         <div>
           <strong>{{ __('adminhub::global.notes') }}:</strong>
 
-          <p class="text-sm mt-1 {{ !$order->notes ? 'text-gray-500' : '' }}">
-            @if ($order->notes)
-              {{ $order->notes }}
+          <p class="text-sm mt-1 {{ !$order->meta->notes ? 'text-gray-500' : '' }}">
+            @if ($order->meta->notes)
+              {{ $order->meta->notes }}
             @else
               {{ __('adminhub::partials.orders.totals.notes_empty') }}
             @endif

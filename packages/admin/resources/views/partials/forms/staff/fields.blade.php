@@ -98,11 +98,11 @@
                 </div>
             </div>
 
-            @if($this->ownAccount)
-            <x-hub::alert level="danger" class="rounded-none">
-              {{ __('adminhub::settings.staff.form.danger_zone.own_account') }}
-            </x-hub:alert>
-            @endif
+{{--            @if($this->ownAccount)--}}
+{{--            <x-hub::alert level="danger" class="rounded-none">--}}
+{{--              {{ __('adminhub::settings.staff.form.danger_zone.own_account') }}--}}
+{{--            </x-hub:alert>--}}
+{{--            @endif--}}
         </div>
     </div>
 

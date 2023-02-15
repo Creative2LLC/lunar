@@ -87,14 +87,14 @@ class ProductsTable extends Table
             }),
             ImageColumn::make('thumbnail', function ($record) {
                 if ($record->thumbnail) {
-                    return $record->thumbnail->getUrl('small');
+                    return spatie_asset($record->thumbnail, 'small');
                 }
 
                 $variant = $record->variants->first(function ($variant) {
-                    return $variant->thumbnail;
+                    return spatie_asset($variant->thumbnail, 'small');
                 });
 
-                return $variant?->thumbnail?->getUrl('small');
+                return spatie_asset($variant?->thumbnail, 'small');
             })->heading(false),
             TextColumn::make('name', function ($record) {
                 return $record->translateAttribute('name');
@@ -209,9 +209,9 @@ class ProductsTable extends Table
         }
 
         return $this->tableBuilder
-        ->searchTerm($query)
-        ->queryStringFilters($filters)
-        ->perPage($this->perPage)
-        ->getData();
+            ->searchTerm($query)
+            ->queryStringFilters($filters)
+            ->perPage($this->perPage)
+            ->getData();
     }
 }

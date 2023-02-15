@@ -228,9 +228,9 @@
                 </tfoot>
             </table>
 
-            @if($order->notes)
+            @if($order->meta->notes)
             <p><strong>Order Notes</strong><br>
-            {{ $order->notes }}</p>
+            {{ $order->meta->notes }}</p>
             <br>
             @endif
         </div>

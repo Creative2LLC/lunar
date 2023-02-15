@@ -9,7 +9,6 @@ use Illuminate\Support\Str;
 use Livewire\TemporaryUploadedFile;
 use Spatie\Activitylog\Facades\LogBatch;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
-use Livewire\FileUploadConfiguration;
 
 trait HasImages
 {
@@ -82,13 +81,12 @@ trait HasImages
                     'thumbnail' => $media->getFullUrl('medium'),
                     'original' => $media->getFullUrl(),
                     'preview' => false,
-                    'edit' => false,
                     'caption' => $media->getCustomProperty('caption'),
                     'primary' => $media->getCustomProperty('primary'),
                     'position' => $media->getCustomProperty('position', 1),
                 ],
             ];
-        })->sortBy('position')->toArray();
+        })->sortBy('position')->values()->toArray();
     }
 
     /**
@@ -155,25 +153,23 @@ trait HasImages
 
             return;
         }
-
-        foreach ($filenames as $fileKey => $filename) {
+        foreach ($filenames as $key => $filename) {
             $file = TemporaryUploadedFile::createFromLivewire($filename);
 
-            $sortKey = Str::random();
+            $key = Str::random();
 
-            $this->images[$sortKey] = [
+            $this->images[$key] = [
                 'thumbnail' => $file->temporaryUrl(),
-                'sort_key' => $sortKey,
+                'sort_key' => $key,
                 'filename' => $filename,
                 'original' => $file->temporaryUrl(),
                 'caption' => null,
-                'position' => collect($this->images)->max('position') + 1,
+                'position' => count($this->images) + 1,
                 'preview' => false,
-                'edit' => false,
                 'primary' => ! count($this->images),
             ];
 
-            unset($this->imageUploadQueue[$fileKey]);
+            unset($this->imageUploadQueue[$key]);
         }
     }
 
@@ -190,7 +186,7 @@ trait HasImages
             $this->images[$index]['position'] = $item['order'];
         }
 
-        $this->images = collect($this->images)->sortBy('position')->toArray();
+        $this->images = collect($this->images)->sortBy('position')->values()->toArray();
     }
 
     /**
@@ -216,51 +212,21 @@ trait HasImages
                 $media->forceDelete();
             });
 
-            $variants = collect();
-
-            if ($owner->variants) {
-                $variants = $owner->variants->load('images');
-            }
-
             foreach ($this->images as $key => $image) {
-                $file = null;
-                $imageEdited = false;
-                $previousMediaId = false;
+                if (empty($image['id'])) {
+                    $file = TemporaryUploadedFile::createFromLivewire(
+                        $image['filename']
+                    );
 
-                // edited image
-                if ($image['file'] ?? false && $image['file'] instanceof TemporaryUploadedFile) {
-                    /** @var TemporaryUploadedFile $file */
-                    $file = $image['file'];
+                    $mediaLibaryDisk = config('media-library.disk_name');
+                    $mediaLibaryDriverConfig = Storage::disk($mediaLibaryDisk)->getConfig();
+                    $mediaLibaryDriver = $mediaLibaryDriverConfig['driver'];
 
-                    if (isset($image['id'])) {
-                        $previousMediaId = $image['id'];
-                    }
-
-                    unset($this->images[$key]['file']);
-
-                    $imageEdited = true;
-                }
-
-                if (empty($image['id']) || $imageEdited) {
-                    if (! $imageEdited) {
-                        $file = TemporaryUploadedFile::createFromLivewire(
-                            $image['filename']
-                        );
-                    }
-
-                    // after editing few times the name will get longer and eventually failed to upload
-                    $filename = Str::of($file->getFilename())
-                        ->beforeLast('.')
-                        ->substr(0, 128)
-                        ->append('.', $file->getClientOriginalExtension());
-
-                    if (FileUploadConfiguration::isUsingS3()) {
-                        $media = $owner->addMediaFromDisk($file->getRealPath())
-                            ->usingFileName($filename)
+                    if ($mediaLibaryDriver == 'local') {
+                        $media = $owner->addMedia($file->getRealPath())
                             ->toMediaCollection('images');
                     } else {
-                        $media = $owner->addMedia($file->getRealPath())
-                            ->usingFileName($filename)
+                        $media = $owner->addMediaFromDisk($file->getRealPath())
                             ->toMediaCollection('images');
                     }
 
@@ -273,28 +239,6 @@ trait HasImages
 
                     // Add ID for future and processing now.
                     $this->images[$key]['id'] = $media->id;
-
-                    // reset image thumbnail
-                    if ($imageEdited) {
-                        $this->images[$key]['thumbnail'] = $media->getFullUrl('medium');
-                        $this->images[$key]['original'] = $media->getFullUrl();
-
-                        // link variants image to the new media
-                        if ($previousMediaId) {
-                            $variants->each(function ($variant) use ($previousMediaId, $media) {
-                                $variantMedia = $variant->images->where('id', $previousMediaId)->first();
-
-                                if ($variantMedia) {
-                                    $variant->images()->attach($media, [
-                                        'primary' => $variantMedia->pivot->primary,
-                                    ]);
-                                }
-                            });
-
-                            $owner->media()->find($previousMediaId)->delete();
-                        }
-                    }
-
                     $image['id'] = $media->id;
                 }
 
@@ -336,7 +280,6 @@ trait HasImages
             '--ids' => $id,
             '--force' => true,
         ]);
-
         $this->notify(
             __('adminhub::partials.image-manager.remake_transforms.notify.success')
         );
@@ -350,13 +293,11 @@ trait HasImages
      */
     public function removeImage($sortKey)
     {
-        if (! isset($this->images[$sortKey])) {
-            return;
-        }
+        $index = collect($this->images)->search(fn ($image) => $sortKey == $image['sort_key']);
 
-        $image = $this->images[$sortKey];
+        $image = $this->images[$index];
 
-        unset($this->images[$sortKey]);
+        unset($this->images[$index]);
 
         // If this was a primary image and we have images left over
         // set the first image to be primary.
@@ -369,10 +310,6 @@ trait HasImages
     {
         $chosen = Media::findMany($this->selectedImages);
 
-        $images = collect($this->images);
-
-        $maxPosition = $images->max('position');
-
         foreach ($chosen as $media) {
             $key = Str::random();
             $this->images[$key] = [
@@ -382,17 +319,10 @@ trait HasImages
                 'filename' => $media->file_name,
                 'original' => $media->getUrl(),
                 'caption' => null,
-                'position' => $maxPosition + 1,
+                'position' => $media->getCustomProperty('position'),
                 'preview' => false,
-                'edit' => false,
-                'primary' => ! count($this->images),
+                'primary' => false,
             ];
-        }
-
-        $hasPrimary = $images->search(fn ($image) => $image['primary'] === true);
-
-        if ($hasPrimary === false) {
-            $this->images[array_key_first($this->images)]['primary'] = true;
         }
 
         $this->selectedImages = [];

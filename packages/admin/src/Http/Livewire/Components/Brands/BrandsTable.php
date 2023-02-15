@@ -28,7 +28,7 @@ class BrandsTable extends LunarTable
                     return null;
                 }
 
-                return $thumbnail->getUrl('small');
+                return spatie_asset($thumbnail, 'small');
             })->heading(false),
             TextColumn::make('name')->url(function ($record) {
                 return route('hub.brands.show', $record->id);

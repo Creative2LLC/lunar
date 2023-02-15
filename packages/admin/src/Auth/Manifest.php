@@ -140,9 +140,19 @@ class Manifest
                 __('adminhub::auth.permissions.catalogue.customers.description')
             ),
             new Permission(
-                __('adminhub::auth.permissions.discounts.name'),
-                'catalogue:manage-discounts',
-                __('adminhub::auth.permissions.discounts.description')
+                'Manage Events',
+                'events:manage',
+                'Allows the user to manage events.'
+            ),
+            new Permission(
+                'Manage Exhibitors',
+                'exhibitors:manage',
+                'Allows the user to manage exhibitors.'
+            ),
+            new Permission(
+                'Manage FAQs',
+                'faqs:manage',
+                'Allows the user to manage FAQs.'
             ),
         ];
     }
